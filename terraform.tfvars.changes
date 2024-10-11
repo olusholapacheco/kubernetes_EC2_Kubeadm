@@ -1,0 +1,6 @@
+# aws_region    = "us-east-1"
+# instance_type = "t3.medium"
+# ami_id        = "ami-003932de22c285676"
+# vpc_id        = "vpc-027b20294366b2905"
+# ssh_key_name  = "generated-key"
+# cidr_blocks   = ["0.0.0.0/0"]

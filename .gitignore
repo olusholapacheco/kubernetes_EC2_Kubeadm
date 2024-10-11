@@ -16,15 +16,19 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 
+
+# Ignore SSH keys and other sensitive files
+id_rsa
+id_rsa.pub
+private_key.pem
+public_key.pem
+
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
-
-# Ignore transient lock info files created by terraform apply
-.terraform.tfstate.lock.info
 
 # Include override files you do wish to add to version control using negated pattern
 # !example_override.tf
