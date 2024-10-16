@@ -74,3 +74,5 @@ jobs:
         ssh -o "StrictHostKeyChecking=no" ubuntu@$WORKER_NODE_IP "sudo bash /root/workers.sh"
       env:
         WORKER_NODE_IP: ${{ env.WORKER_NODE_IP }}
+
+#
