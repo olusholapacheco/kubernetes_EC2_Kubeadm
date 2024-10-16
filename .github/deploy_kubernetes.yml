@@ -1,0 +1,76 @@
+name: Deploy Kubernetes Cluster using Kubeadm and AWS EC2s
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    outputs:
+      master_node_ip: ${{ steps.apply.outputs.master_node_ip }}
+      worker_node_ip: ${{ steps.apply.outputs.worker_node_ip }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: 1.0.11
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Initialize Terraform
+      run: terraform init -backend-config="bucket=kubernetes-kubeadm-bucket" -backend-config="key=kubernetes-kubeadm-bucket-key/terraform.tfstate" -backend-config="region=${{ secrets.AWS_REGION }}" -backend-config="dynamodb_table=terraform-lock"
+
+    - name: Import existing IAM Role
+      run: |
+        terraform import aws_iam_role.role S3_role
+
+    - name: Import existing IAM Instance Profile
+      run: |
+        terraform import aws_iam_instance_profile.s3_profile s3_profile
+
+    - name: Apply Terraform
+      id: apply
+      run: |
+        terraform apply -auto-approve
+        echo "MASTER_NODE_IP=$(terraform output -raw master_node_ip)" >> $GITHUB_ENV
+        echo "WORKER_NODE_IP=$(terraform output -raw worker_node_ip)" >> $GITHUB_ENV
+
+  setup-master-node:
+    runs-on: ubuntu-latest
+    needs: deploy-infrastructure
+
+    steps:
+    - name: Wait for master node to be ready
+      run: |
+        while ! ssh -o "StrictHostKeyChecking=no" ubuntu@$MASTER_NODE_IP "kubectl get nodes | grep Ready"; do
+          echo "Waiting for master node to be ready..."
+          sleep 10
+        done
+
+    - name: Run master node script
+      run: |
+        ssh -o "StrictHostKeyChecking=no" ubuntu@$MASTER_NODE_IP "sudo bash /root/master.sh"
+      env:
+        MASTER_NODE_IP: ${{ env.MASTER_NODE_IP }}
+
+  setup-worker-node:
+    runs-on: ubuntu-latest
+    needs: deploy-infrastructure
+
+    steps:
+    - name: Run worker node script
+      run: |
+        ssh -o "StrictHostKeyChecking=no" ubuntu@$WORKER_NODE_IP "sudo bash /root/workers.sh"
+      env:
+        WORKER_NODE_IP: ${{ env.WORKER_NODE_IP }}

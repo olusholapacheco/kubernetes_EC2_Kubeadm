@@ -28,7 +28,7 @@ jobs:
         aws-region: ${{ secrets.AWS_REGION }}
 
     - name: Initialize Terraform
-      run: terraform init -backend-config="bucket=my-terraform-state-bucket20124" -backend-config="key=my-my-terraform-state-bucket2024/terraform.tfstate" -backend-config="region=${{ secrets.AWS_REGION }}" -backend-config="dynamodb_table=terraform-locks"
+      run: terraform init -backend-config="bucket=kubernetes-kubeadm-bucket" -backend-config="key=kubernetes-kubeadm-bucket-key/terraform.tfstate" -backend-config="region=${{ secrets.AWS_REGION }}" -backend-config="dynamodb_table=terraform-lock"
 
     - name: Destroy Terraform resources
       run: terraform destroy -auto-approve
