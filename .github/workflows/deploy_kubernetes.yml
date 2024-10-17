@@ -31,11 +31,16 @@ jobs:
     - name: Initialize Terraform
       run: terraform init -backend-config="bucket=kubernetes-kubeadm-bucket" -backend-config="key=kubernetes-kubeadm-bucket-key/terraform.tfstate" -backend-config="region=${{ secrets.AWS_REGION }}" -backend-config="dynamodb_table=terraform-lock"
 
-    - name: Import existing IAM Role
-      run: terraform import aws_iam_role.role S3_role
 
-    - name: Import existing IAM Instance Profile
-      run: terraform import aws_iam_instance_profile.s3_profile s3_profile
+    # Check if IAM Role is already imported; if not, import it
+    - name: Check if IAM Role is already imported
+      run: |
+       terraform state show aws_iam_role.role || terraform import aws_iam_role.role S3_role
+  
+    # Check if IAM Instance Profile is already imported; if not, import it
+    - name: Check if IAM Instance Profile is already imported
+      run: |
+        terraform state show aws_iam_instance_profile.s3_profile || terraform import aws_iam_instance_profile.s3_profile s3_profile
 
     - name: Apply Terraform
       id: apply
