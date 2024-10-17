@@ -41,7 +41,13 @@ jobs:
     - name: Check if IAM Instance Profile is already imported
       run: |
         terraform state show aws_iam_instance_profile.s3_profile || terraform import aws_iam_instance_profile.s3_profile s3_profile
-
+    
+    # Check if IAM Policy is already imported; if not, import it
+    # This prevents the policy duplication error
+    - name: Check if IAM Policy is already imported
+      run: |
+        terraform state show aws_iam_policy.policy || terraform import aws_iam_policy.policy arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:policy/s3AccessPolicy
+    
     - name: Apply Terraform
       id: apply
       run: |
