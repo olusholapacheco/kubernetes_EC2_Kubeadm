@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       master_node_ip: ${{ steps.set-ips.outputs.master_node_ip }}
-      worker_node_ip: ${{ steps.set-ips.outputs.worker_node_ip }}
+      worker_node_ips: ${{ steps.set-ips.outputs.worker_node_ips }}
 
     steps:
     - name: Checkout repository
@@ -39,9 +39,10 @@ jobs:
       id: set-ips
       run: |
         echo "MASTER_NODE_IP=$(terraform output -raw master_public_ip)" >> $GITHUB_ENV
-        echo "WORKER_NODE_IP=$(terraform output -raw worker_public_ips)" >> $GITHUB_ENV
-        echo "::set-output name=master_node_ip::$(terraform output -raw master_public_ip)"
-        echo "::set-output name=worker_node_ip::$(terraform output -raw worker_public_ips)"
+        echo "WORKER_NODE_IPS=$(terraform output -json worker_public_ips)" >> $GITHUB_ENV
+      outputs:
+        master_node_ip: ${{ steps.set-ips.outputs.master_node_ip }}
+        worker_node_ips: ${{ steps.set-ips.outputs.worker_node_ips }}
 
   setup-master-node:
     runs-on: ubuntu-latest
@@ -64,8 +65,9 @@ jobs:
     needs: deploy-infrastructure
 
     steps:
-    - name: Run worker node script
+    - name: Run worker node script on all workers
       run: |
-        ssh -o "StrictHostKeyChecking=no" ubuntu@${{ needs.deploy-infrastructure.outputs.worker_node_ip }} "sudo bash /root/workers.sh"
-
-
+        WORKER_NODE_IPS=${{ needs.deploy-infrastructure.outputs.worker_node_ips }}
+        for ip in $(echo $WORKER_NODE_IPS | jq -r '.[]'); do
+          ssh -o "StrictHostKeyChecking=no" ubuntu@$ip "sudo bash /root/workers.sh"
+        done
