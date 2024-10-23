@@ -49,8 +49,7 @@ jobs:
 
     - name: Apply Terraform
       id: apply
-      run: |
-        terraform apply -auto-approve
+      run: terraform apply -auto-approve
 
     - name: Set master and worker node IPs
       id: set-ips
@@ -70,9 +69,6 @@ jobs:
 
         echo "MASTER_NODE_IP=$MASTER_NODE_IP" >> $GITHUB_ENV
         echo "WORKER_NODE_IPS=$WORKER_NODE_IPS" >> $GITHUB_ENV
-      outputs:
-        master_node_ip: ${{ steps.set-ips.outputs.MASTER_NODE_IP }}
-        worker_node_ips: ${{ steps.set-ips.outputs.WORKER_NODE_IPS }}
 
   setup-master-node:
     runs-on: ubuntu-latest
@@ -81,16 +77,14 @@ jobs:
     steps:
     - name: Wait for master node to be ready
       run: |
-        while ! ssh -o "StrictHostKeyChecking=no" ubuntu@$MASTER_NODE_IP "kubectl get nodes | grep Ready"; do
+        while ! ssh -o "StrictHostKeyChecking=no" ubuntu@${{ needs.deploy-infrastructure.outputs.master_node_ip }} "kubectl get nodes | grep Ready"; do
           echo "Waiting for master node to be ready..."
           sleep 10
         done
 
     - name: Run master node script
       run: |
-        ssh -o "StrictHostKeyChecking=no" ubuntu@$MASTER_NODE_IP "sudo bash /root/master.sh"
-      env:
-        MASTER_NODE_IP: ${{ env.MASTER_NODE_IP }}
+        ssh -o "StrictHostKeyChecking=no" ubuntu@${{ needs.deploy-infrastructure.outputs.master_node_ip }} "sudo bash /root/master.sh"
 
   setup-worker-node:
     runs-on: ubuntu-latest
@@ -99,8 +93,6 @@ jobs:
     steps:
     - name: Run worker node script
       run: |
-        for worker_ip in $WORKER_NODE_IPS; do
+        for worker_ip in ${{ needs.deploy-infrastructure.outputs.worker_node_ips }}; do
           ssh -o "StrictHostKeyChecking=no" ubuntu@$worker_ip "sudo bash /root/workers.sh"
         done
-      env:
-        WORKER_NODE_IPS: ${{ env.WORKER_NODE_IPS }}
