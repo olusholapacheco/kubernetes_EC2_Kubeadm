@@ -40,9 +40,12 @@ jobs:
       run: |
         echo "MASTER_NODE_IP=$(terraform output -raw master_public_ip)" >> $GITHUB_ENV
         echo "WORKER_NODE_IPS=$(terraform output -json worker_public_ips)" >> $GITHUB_ENV
-      outputs:
-        master_node_ip: ${{ steps.set-ips.outputs.master_node_ip }}
-        worker_node_ips: ${{ steps.set-ips.outputs.worker_node_ips }}
+
+    - name: Output master and worker node IPs for job
+      id: export-ips
+      run: |
+        echo "::set-output name=master_node_ip::$(terraform output -raw master_public_ip)"
+        echo "::set-output name=worker_node_ips::$(terraform output -json worker_public_ips)"
 
   setup-master-node:
     runs-on: ubuntu-latest
