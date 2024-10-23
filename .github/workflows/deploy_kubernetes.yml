@@ -31,21 +31,48 @@ jobs:
     - name: Initialize Terraform
       run: terraform init -backend-config="bucket=kubernetes-kubeadm-bucket" -backend-config="key=kubernetes-kubeadm-bucket-key/terraform.tfstate" -backend-config="region=${{ secrets.AWS_REGION }}" -backend-config="dynamodb_table=terraform-lock"
 
+    # Check if IAM Role is already imported; if not, import it
+    - name: Check if IAM Role is already imported
+      run: |
+       terraform state show aws_iam_role.role || terraform import aws_iam_role.role S3_role
+
+    # Check if IAM Instance Profile is already imported; if not, import it
+    - name: Check if IAM Instance Profile is already imported
+      run: |
+        terraform state show aws_iam_instance_profile.s3_profile || terraform import aws_iam_instance_profile.s3_profile s3_profile
+
+    # Check if IAM Policy is already imported; if not, import it
+    # This prevents the policy duplication error
+    - name: Check if IAM Policy is already imported
+      run: |
+        terraform state show aws_iam_policy.policy || terraform import aws_iam_policy.policy arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:policy/s3AccessPolicy
+
     - name: Apply Terraform
       id: apply
-      run: terraform apply -auto-approve
+      run: |
+        terraform apply -auto-approve
 
     - name: Set master and worker node IPs
       id: set-ips
       run: |
-        echo "MASTER_NODE_IP=$(terraform output -raw master_public_ip)" >> $GITHUB_ENV
-        echo "WORKER_NODE_IPS=$(terraform output -json worker_public_ips)" >> $GITHUB_ENV
+        MASTER_NODE_IP=$(terraform output -raw master_public_ip 2>/dev/null | grep -oP '^\d{1,3}(\.\d{1,3}){3}$')
+        WORKER_NODE_IPS=$(terraform output -json worker_public_ips 2>/dev/null | jq -r '.[]')
 
-    - name: Output master and worker node IPs for job
-      id: export-ips
-      run: |
-        echo "::set-output name=master_node_ip::$(terraform output -raw master_public_ip)"
-        echo "::set-output name=worker_node_ips::$(terraform output -json worker_public_ips)"
+        if [ -z "$MASTER_NODE_IP" ]; then
+          echo "Error: Failed to retrieve master node IP."
+          exit 1
+        fi
+
+        if [ -z "$WORKER_NODE_IPS" ]; then
+          echo "Error: Failed to retrieve worker node IPs."
+          exit 1
+        fi
+
+        echo "MASTER_NODE_IP=$MASTER_NODE_IP" >> $GITHUB_ENV
+        echo "WORKER_NODE_IPS=$WORKER_NODE_IPS" >> $GITHUB_ENV
+      outputs:
+        master_node_ip: ${{ steps.set-ips.outputs.MASTER_NODE_IP }}
+        worker_node_ips: ${{ steps.set-ips.outputs.WORKER_NODE_IPS }}
 
   setup-master-node:
     runs-on: ubuntu-latest
@@ -54,23 +81,26 @@ jobs:
     steps:
     - name: Wait for master node to be ready
       run: |
-        while ! ssh -o "StrictHostKeyChecking=no" ubuntu@${{ needs.deploy-infrastructure.outputs.master_node_ip }} "kubectl get nodes | grep Ready"; do
+        while ! ssh -o "StrictHostKeyChecking=no" ubuntu@$MASTER_NODE_IP "kubectl get nodes | grep Ready"; do
           echo "Waiting for master node to be ready..."
           sleep 10
         done
 
     - name: Run master node script
       run: |
-        ssh -o "StrictHostKeyChecking=no" ubuntu@${{ needs.deploy-infrastructure.outputs.master_node_ip }} "sudo bash /root/master.sh"
+        ssh -o "StrictHostKeyChecking=no" ubuntu@$MASTER_NODE_IP "sudo bash /root/master.sh"
+      env:
+        MASTER_NODE_IP: ${{ env.MASTER_NODE_IP }}
 
   setup-worker-node:
     runs-on: ubuntu-latest
     needs: deploy-infrastructure
 
     steps:
-    - name: Run worker node script on all workers
+    - name: Run worker node script
       run: |
-        WORKER_NODE_IPS=${{ needs.deploy-infrastructure.outputs.worker_node_ips }}
-        for ip in $(echo $WORKER_NODE_IPS | jq -r '.[]'); do
-          ssh -o "StrictHostKeyChecking=no" ubuntu@$ip "sudo bash /root/workers.sh"
+        for worker_ip in $WORKER_NODE_IPS; do
+          ssh -o "StrictHostKeyChecking=no" ubuntu@$worker_ip "sudo bash /root/workers.sh"
         done
+      env:
+        WORKER_NODE_IPS: ${{ env.WORKER_NODE_IPS }}
