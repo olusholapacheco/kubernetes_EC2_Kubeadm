@@ -8,9 +8,6 @@ on:
 jobs:
   deploy-infrastructure:
     runs-on: ubuntu-latest
-    outputs:
-      master_node_ip: ${{ steps.set-ips.outputs.master_node_ip }}
-      worker_node_ips: ${{ steps.set-ips.outputs.worker_node_ips }}
 
     steps:
     - name: Checkout repository
@@ -42,7 +39,6 @@ jobs:
         terraform state show aws_iam_instance_profile.s3_profile || terraform import aws_iam_instance_profile.s3_profile s3_profile
     
     # Check if IAM Policy is already imported; if not, import it
-    # This prevents the policy duplication error
     - name: Check if IAM Policy is already imported
       run: |
         terraform state show aws_iam_policy.policy || terraform import aws_iam_policy.policy arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:policy/s3AccessPolicy
@@ -69,9 +65,6 @@ jobs:
 
         echo "MASTER_NODE_IP=$MASTER_NODE_IP" >> $GITHUB_ENV
         echo "WORKER_NODE_IPS=$WORKER_NODE_IPS" >> $GITHUB_ENV
-      outputs:
-        master_node_ip: ${{ steps.set-ips.outputs.master_node_ip }}
-        worker_node_ips: ${{ steps.set-ips.outputs.worker_node_ips }}
 
   setup-master-node:
     runs-on: ubuntu-latest
