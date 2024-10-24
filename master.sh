@@ -26,7 +26,12 @@ apt update
 apt-cache policy docker-ce
 apt install docker-ce -y
 apt install containerd.io -y
-apt install awscli -y   
+
+sudo apt-get install -y unzip
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+aws --version  
 
 #Be sure to understand, if you follow official Kubernetes documentation, in Ubuntu 20 it does not work, that is why, I did modification to script
 #Adding Kubernetes repositories

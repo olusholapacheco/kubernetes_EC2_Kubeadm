@@ -38,6 +38,22 @@ resource "aws_security_group" "k8s_sg" {
     cidr_blocks = var.cidr_blocks
   }
 
+  # All ICMP -IPV4 for 172.31.0.0/16
+  ingress = {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["172.31.0.0.16"]
+  }
+
+  # Custom TCP for port 6443 from 172.31.0.0/16
+  ingress {
+    from_port = 6443
+    to_port = 6443
+    protocol = "tcp"
+    cidr_blocks = ["172.31.0.0/16"]
+  }
+
   # General outbound rules
   egress {
     from_port   = 0
